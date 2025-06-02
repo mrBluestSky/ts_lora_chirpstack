@@ -15,7 +15,7 @@ use crate::storage::{
     helpers::get_all_device_data,
     metrics, tenant,
 };
-use crate::{config, devaddr::get_random_dev_addr, integration, region, stream};
+use crate::{config, devaddr::get_random_dev_addr_slot, integration, region, stream};
 use backend::{PRStartAnsPayload, PRStartReqPayload};
 use chirpstack_api::{common, integration as integration_pb, internal, stream as stream_pb};
 use lrwn::{keys, AES128Key, DevAddr, NetID};
@@ -79,6 +79,10 @@ impl JoinRequest {
             js_session_key_id: "".to_string(),
         };
 
+        let dev_eui = ctx.join_request.as_ref().unwrap().dev_eui.to_string();
+
+        println!("Received new join_sns request from {:?}", dev_eui);
+
         ctx.get_join_request_payload()?;
         ctx.get_device_data().await?;
         ctx.check_roaming_allowed()?;
@@ -86,7 +90,7 @@ impl JoinRequest {
         ctx.set_device_info()?;
         ctx.abort_on_device_is_disabled()?;
         ctx.abort_on_otaa_is_disabled()?;
-        ctx.get_random_dev_addr()?;
+        ctx.get_random_dev_addr().await?;
         if ctx.js_client.is_some() {
             // Using join-server
             ctx.get_join_accept_from_js().await?;
@@ -101,6 +105,10 @@ impl JoinRequest {
         ctx.flush_device_queue().await?;
         ctx.update_device().await?;
         ctx.send_join_event().await?;
+
+        
+        println!("Join_sns accept sent to {:?}", dev_eui);
+
         ctx.set_pr_start_ans_payload()?;
 
         ctx.pr_start_ans
@@ -207,8 +215,10 @@ impl JoinRequest {
         Ok(())
     }
 
-    fn get_random_dev_addr(&mut self) -> Result<()> {
-        self.dev_addr = Some(get_random_dev_addr());
+    async fn get_random_dev_addr(&mut self) -> Result<()> {
+        trace!("Setting random DevAddr");
+        let d = self.device.as_mut().unwrap();
+        d.dev_addr = Some(get_random_dev_addr_slot(d.dev_eui).await?);
         Ok(())
     }
 

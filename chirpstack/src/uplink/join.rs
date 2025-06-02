@@ -112,11 +112,9 @@ impl JoinRequest {
         ctx.get_join_request_payload()?;
 
         // Add resolved DevEUI to the span
-        let span = tracing::Span::current();
-        span.record(
-            "dev_eui",
-            ctx.join_request.as_ref().unwrap().dev_eui.to_string(),
-        );
+        let dev_eui = ctx.join_request.as_ref().unwrap().dev_eui.to_string();
+
+        println!("Received new join request from {:?}", dev_eui);
 
         ctx.get_device_data_or_try_pr_roaming().await?;
         ctx.get_device_keys_or_js_client().await?; // used to validate MIC + if we need external JS
@@ -145,6 +143,7 @@ impl JoinRequest {
         ctx.start_downlink_join_accept_flow().await?;
         ctx.send_join_event().await?;
 
+        println!("Join accept sent to {:?}", dev_eui);
         Ok(())
     }
 
